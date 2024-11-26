@@ -56,7 +56,7 @@ $
 _pragma(classify_level=advanced, usage={subclassable})
 vmsql_database_test_helper.define_shared_variable(:vmds_vmsql_dataset_map,
 	## to map vmds datasets to vmsql "version" of those datasets
-	property_list.new_with(:gis,:gis_pg,:electricity,:electricity_pg), :private)
+	property_list.new_with(:gis,:gis_pg), :private)
 $
 
 _pragma(classify_level=advanced, usage={subclassable})
