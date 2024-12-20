@@ -388,6 +388,7 @@ _private _method database_test.check_correct_database_open()
 	_then
 		database_path +<<"/../../pg/ds_admin"
 	_endif
+	write("!!!!!! ",_self,tab_char,database_path)
 	_self.database_opened? << _false
 	
 	_if _not ds_environment.c_is_initialised? _orif
@@ -396,9 +397,9 @@ _private _method database_test.check_correct_database_open()
 		ds_environment.concurrency_mode <> _self.concurrency_mode
 	_then 
 		# Suppress witterage
-		_handling information _with procedure 
-		_dynamic !output!
-		!output! << _self.suppress_witterage(_not !msf_debug?!)
+		#_handling information _with procedure 
+		#_dynamic !output!
+		#!output! << _self.suppress_witterage(_not !msf_debug?!)
 
 		ds_environment.concurrency_mode << _self.concurrency_mode
 		smallworld_product.set_startup_option(:authorisation, :singleuser)
