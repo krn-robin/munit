@@ -42,6 +42,16 @@ database_test.define_shared_variable(:database_path,
         "cbgsun11:/swdev/databases/dev_ds_500/ds/ds_admin", :public)
 $
 
+_pragma(classify_level=debug)
+database_test.define_shared_variable(:vmsql_database_relative_path,
+        ##
+        ## relative path from database_path to ace.ds with vmsql
+        ## partitions definitions
+        ##
+        "/../../pg/ds_admin", :public)
+$
+
+
 
 _pragma(classify_level=debug)
 database_test.define_shared_variable(:concurrency_mode,
@@ -386,9 +396,9 @@ _private _method database_test.check_correct_database_open()
 	database_path << _self.database_path
 	_if _self.database_storage_mode = :vmsql
 	_then
-		database_path +<<"/../../pg/ds_admin"
+		database_path +<< _self.vmsql_database_relative_path
 	_endif
-	write("!!!!!! ",_self,tab_char,database_path)
+
 	_self.database_opened? << _false
 	
 	_if _not ds_environment.c_is_initialised? _orif
@@ -397,9 +407,9 @@ _private _method database_test.check_correct_database_open()
 		ds_environment.concurrency_mode <> _self.concurrency_mode
 	_then 
 		# Suppress witterage
-		#_handling information _with procedure 
-		#_dynamic !output!
-		#!output! << _self.suppress_witterage(_not !msf_debug?!)
+		_handling information _with procedure 
+		_dynamic !output!
+		!output! << _self.suppress_witterage(_not !msf_debug?!)
 
 		ds_environment.concurrency_mode << _self.concurrency_mode
 		smallworld_product.set_startup_option(:authorisation, :singleuser)
