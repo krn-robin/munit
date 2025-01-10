@@ -429,7 +429,7 @@ _private _method database_test.check_correct_database_open()
 		_endif
 		# Only log errors in this way if we are not in debugging mode.
 		# When !msf_debug?! is _true the errors should be logged to !terminal! anyway
-		_if _self.database_opened? _is _false _andif !msf_debug?! _isnt _true
+		_if (_self.database_opened? _is _false _orif _self.all_datasets_opened?() _is _false) _andif !msf_debug?! _isnt _true
 		_then
 			!terminal!.write(!output!.string)
 		_endif
@@ -479,6 +479,25 @@ _private _method database_test.wait_for_threads_to_finish( task_owner )
 		_thisthread.sleep( 1000 )
 	_endloop 
 	
+_endmethod
+$
+
+_pragma(classify_level=restricted,topic=MUnit)
+_private _method database_test.all_datasets_opened?()
+	##
+	## Checks that all datasets configured in the soc are open.
+	##
+	# database_test calls open_database without specifying the soc name, so it
+	# defaults to :gis.
+	soc << gis_program_manager.spatial_object_controller(:gis)
+	_for ds _over soc.datasets()
+	_loop
+		_if gis_program_manager.cached_dataset(ds.name) _is _unset
+		_then
+			_return _false
+		_endif
+	_endloop
+	_return _true
 _endmethod
 $
 
