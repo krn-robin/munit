@@ -31,11 +31,11 @@ def_slotted_exemplar( :database_test,
 	{
 		{ :properties,   _unset }
 	},
-        { :test_case, :database_system_test_mixin, :vmsql_database_test_helper } )
+        { :test_case, :database_system_test_mixin } )
 $
 
 _pragma(classify_level=debug)
-database_test.define_shared_variable(:vmds_database_path,
+database_test.define_shared_variable(:database_path,
         ##
         ## The location of the cambridge_db to use.
         ##
@@ -43,13 +43,15 @@ database_test.define_shared_variable(:vmds_database_path,
 $
 
 _pragma(classify_level=debug)
-database_test.define_shared_variable(:vmsql_database_path,
+database_test.define_shared_variable(:vmsql_database_relative_path,
         ##
-        ## The location of the cambridge_db to use for VMSQL.
+        ## relative path from database_path to ace.ds with vmsql
+        ## partitions definitions
         ##
-	        "cbgsun11:/swdev/databases/dev_ds_500_vmsql/ds/ds_admin", :public)
-	
+        "/../../pg/ds_admin", :public)
 $
+
+
 
 _pragma(classify_level=debug)
 database_test.define_shared_variable(:concurrency_mode,
@@ -76,9 +78,13 @@ _pragma(classify_level=debug)
 database_test.define_shared_variable( :force_close?, _true, :private )
 $
 
+
 _pragma(classify_level=debug)
-## Cambridge_db dump file name
-database_test.define_shared_constant( :dump_file_name, "camdb_gis.dump", :private )
+database_test.define_shared_variable(:database_storage_mode, 
+	##
+	## Can be set to :vmsql in order to create datasets in Postgres.
+	##
+	:vmds, :private)
 $
 
 database_test.method_table.resolve_conflicts( :test_case )
@@ -94,27 +100,6 @@ _method database_test.properties
 _endmethod
 $
 
-_pragma(classify_level=debug)
-_method database_test.database_path
-	## 
-	## Returns the database_path.  When database_storage_mode is :vmsql and a local
-	## database is open then the method returns the path of this database for use
-	## by vmsql.
-	##
-	_if _self.database_storage_mode _is :vmsql
-	_then
-		_if _self.is_vmds_database_local?
-		_then
-			# Developer mode, use the currently open db
-			_return gis_program_manager.ace_top_view.searchpath.at_using_default("", 1)
-		_else 
-			_return _self.vmsql_database_path
-		_endif
-	_else
-		_return _self.vmds_database_path
-	_endif
-_endmethod
-$
 
 
 _pragma(classify_level=debug, usage={subclassable})
@@ -193,12 +178,9 @@ _private _method database_test.make_dataset_clones()
 				_then
 					_self.clones[ds_name][i]<< clone<< gis_ds_view.new(:write, :searchpath, v.searchpath)
 				_else
-					dataset_name << ds_name+:|_|+cont.write_string.as_symbol()
 					_self.clones[ds_name][i]<< clone<< gis_ds_view.new(:write,
 											   :concurrency_mode, :vmsql,
-											   :searchpath, v.searchpath,
-											   :name, dataset_name)
-					_self.import_vmsql_dump(dataset_name,_self.dump_file_name)
+											   :name, ds_name)
 				_endif
 
 				_for f _over v.files.fast_elements()
@@ -326,9 +308,7 @@ _method database_test.one_time_set_up()
         ## Subclass implemetations should always call _super.
 	##
 	_super.one_time_set_up()
-	.replaced_dataset_managers << property_list.new()
 	_self.check_correct_database_open()
-	_self.one_time_set_up_vmsql()
 	_self.make_dataset_clones()
 _endmethod
 $
@@ -366,7 +346,6 @@ _method database_test.one_time_tear_down()
         ## Subclass implemetations should always call _super.
 	##
 	_super.one_time_tear_down()
-	_self.one_time_tear_down_vmsql()
 	_if _self.database_opened? _orif
 	    _self.force_close?
 	_then 
@@ -387,7 +366,6 @@ _method database_test.set_up()
 	##
         _super.set_up()
 	.properties << property_list.new()
-	_self.set_up_vmsql()
 	_self.given_writable_datasets( _self.writable_dataset_names )
 	_self.given_writable_dataset_clones()
 _endmethod
@@ -414,21 +392,24 @@ _private _method database_test.check_correct_database_open()
         ## path is incorrect) then closes that and opens the correct
         ## one.
         ##
-	
+
+	database_path << _self.database_path
+	_if _self.database_storage_mode = :vmsql
+	_then
+		database_path +<< _self.vmsql_database_relative_path
+	_endif
+
 	_self.database_opened? << _false
 	
 	_if _not ds_environment.c_is_initialised? _orif
 		gis_program_manager.ace_top_view _is _unset _orif
-		gis_program_manager.ace_top_view.searchpath.at_using_default("", 1) <> _self.database_path _orif
+		gis_program_manager.ace_top_view.searchpath.at_using_default("", 1) <> database_path _orif
 		ds_environment.concurrency_mode <> _self.concurrency_mode
 	_then 
 		# Suppress witterage
 		_handling information _with procedure 
 		_dynamic !output!
-		_if !msf_debug?! _isnt _true
-		_then
-			!output!<< internal_text_output_stream.new()
-		_endif
+		!output! << _self.suppress_witterage(_not !msf_debug?!)
 
 		ds_environment.concurrency_mode << _self.concurrency_mode
 		smallworld_product.set_startup_option(:authorisation, :singleuser)
@@ -439,13 +420,19 @@ _private _method database_test.check_correct_database_open()
 			smallworld_product.set_startup_option(:interactive?, _false)
 		_endif
 		gis_program_manager.reinitialise()
-		_self.prep_vmsql_db()
-		open_database({_self.database_path})
+		
+		_self.database_opened? << open_database({database_path})
+
 		_if interactive?
 		_then 
 			smallworld_product.set_startup_option(:interactive?, _true)
 		_endif
-		_self.database_opened? << _true
+		# Only log errors in this way if we are not in debugging mode.
+		# When !msf_debug?! is _true the errors should be logged to !terminal! anyway
+		_if (_self.database_opened? _is _false _orif _self.all_datasets_opened?() _is _false) _andif !msf_debug?! _isnt _true
+		_then
+			!terminal!.write(!output!.string)
+		_endif
 	_endif
 	_self.open_other_datasets()
 _endmethod
@@ -495,30 +482,59 @@ _private _method database_test.wait_for_threads_to_finish( task_owner )
 _endmethod
 $
 
-_private _method database_test.ant_executable
+_pragma(classify_level=restricted,topic=MUnit)
+_private _method database_test.all_datasets_opened?()
 	##
-	## Returns the full path to the ant executable.  Depends on the ANT_HOME
-	## environment variable being set.  For Linux the ant executalbe will just be
-	## ant, for Windows it will be ant.bat.  Raises warnings when ANT_HOME is not
-	## set or when the ant executable is not found where the code expects it to be.
+	## Checks that all datasets configured in the soc are open.
 	##
-	ant_home << system.getenv("ANT_HOME")
-	_if ant_home _is _unset
-	_then
-		condition.raise(:warning, :string, "ANT_HOME is not set!")
-	_endif
-		
-	ant_exe_ext << ""
-	_if system.os_name _is :windows 
-	_then
-		ant_exe_ext << ".bat"
-	_endif
+	# database_test calls open_database without specifying the soc name, so it
+	# defaults to :gis.
+	soc << gis_program_manager.spatial_object_controller(:gis)
+	_for ds _over soc.datasets()
+	_loop
+		_if gis_program_manager.cached_dataset(ds.name) _is _unset
+		_then
+			_return _false
+		_endif
+	_endloop
+	_return _true
+_endmethod
+$
 
-	ant_exe << 	system.pathname_down(ant_home, "bin", write_string("ant", ant_exe_ext))
-	_if _not system.file_exists?(ant_exe)
+_pragma(classify_level=restricted,topic=MUnit,usage=subclassable)
+_private _method database_test.system64?
+	## returns _maybe if there is not any database view,
+	##         _true there is at least one 64bit view
+	##         _false they are all 32bit
+	##
+	view?<< _false 
+	_for view _over gis_program_manager.databases.fast_elements()
+	_loop
+		# skip sw_abstracted_dataset(cam_db_abstracted_som)
+		_if _not view.responds_to?(:system64?) _then _continue _endif 
+		view?<< _true 
+		_if _self.system64?(view)
+		_then _return _true
+		_endif
+	_endloop
+	>> _if view?
+	   _then >> _false
+	   _else >> _maybe
+	   _endif
+_endmethod
+$
+
+_method database_test.suppress_witterage(suppress?)
+	##
+	## Method to toggle witterage suppression
+	## suppress? should be a boolean indicating whether to suppress or not.
+	##
+	_if suppress? _is _true
 	_then
-		condition.raise(:warning, :string, write_string("ANT executable does not exist: ", ant_exe))
+		output << internal_text_output_stream.new()
+	_else
+		output << !output!
 	_endif
-	_return ant_exe
+	>> output
 _endmethod
 $
