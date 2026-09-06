@@ -21,7 +21,9 @@ _pragma(classify_level=basic,topic=MUnit)
 def_slotted_exemplar(:test_suite,
 {
 	{ :name  , _unset },
-	{ :tests , _unset }
+	{ :tests , _unset },
+	{ :pending_test_case , _unset },
+	{ :pending_method_names , _unset }
 },
 {:test_interface})
 $
@@ -65,7 +67,8 @@ _private _method test_suite.init(_optional a_test_case , a_name, method_names)
 	_if a_test_case _isnt _unset
 	_then
 		.name << a_name.default( a_test_case.class_name )
-		_self.init_from_test_case( a_test_case, meth_names)
+		.pending_test_case << a_test_case
+		.pending_method_names << meth_names
 	_else
 		.name << a_name
 	_endif
@@ -152,7 +155,8 @@ $
 _pragma(classify_level=basic,topic=MUnit)
 _method test_suite.add_test( a_test )
 	##  Adds a test to the suite.
-	
+
+	_self.ensure_tests_built()
 	.tests.add( a_test )
 _endmethod
 $
@@ -160,7 +164,8 @@ $
 _pragma(classify_level=basic,topic=MUnit)
 _method test_suite.test_count()
 	## Returns the number of tests in this suite.
-	
+
+	_self.ensure_tests_built()
 	>> .tests.size
 _endmethod
 $
@@ -168,7 +173,8 @@ $
 _pragma(classify_level=basic,topic=MUnit)
 _method test_suite.add_test_suite( a_test_case )
 	##  Adds a all tests from A_TEST_CASE to the suite.
-	
+
+	_self.ensure_tests_built()
 	.tests.add( a_test_case.suite() )
 _endmethod
 $
@@ -177,6 +183,7 @@ _pragma(classify_level=basic,topic=MUnit)
 _iter _method test_suite.tests()
 	## Yelds tests in suite.
 
+	_self.ensure_tests_built()
 	_if .tests _isnt _unset
 	_then 
 		_for a_test _over .tests.elements()
@@ -192,7 +199,30 @@ _pragma(classify_level=basic,topic=MUnit)
 _method test_suite.test_at( index )
 	##  Returns the test at the given INDEX.
 
+	_self.ensure_tests_built()
 	>> .tests[ index ]
+_endmethod
+$
+
+_pragma(classify_level=restricted,topic=MUnit)
+_private _method test_suite.ensure_tests_built()
+
+	## Run the init_from_test_case() population that init() deferred, once.
+	##
+	## Reading a suite's name must not cost a walk of the test case's whole
+	## method table: test_case.one_time_behaviour() compares suite_name()
+	## before EVERY test, and suite_name() is suite().get_name().
+
+	_if ( a_test_case << .pending_test_case ) _is _unset
+	_then
+		_return
+	_endif
+
+	.pending_test_case << _unset
+	meth_names << .pending_method_names
+	.pending_method_names << _unset
+
+	_self.init_from_test_case( a_test_case, meth_names )
 _endmethod
 $
 
@@ -316,7 +346,8 @@ _method test_suite.print_on( a_stream _optional level )
 	
 	_self.write_on( a_stream )
 	a_stream.write( newline_char )
-	
+
+	_self.ensure_tests_built()
 	_for a_test _over .tests.elements()
 	_loop
 		_if a_test.is_kind_of?( _self )
@@ -403,7 +434,8 @@ _pragma(classify_level=restricted,topic=MUnit)
 _method test_suite.unsorted_tests()
 	##
 	## Return all runnable tests.
-	## 
+	##
+	_self.ensure_tests_built()
 	>> .tests.default({})
 _endmethod
 $
