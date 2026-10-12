@@ -128,7 +128,7 @@ _global \@_SW5 << _proc@\@_SW5()
 						  gherkin_class.define_shared_constant( :gherkin_mappings, property_list.new(), :public )
 					  _endif
 					  
-					  method_name_without_brackets << read_line.slice( dot_idx + 1, end_idx ).as_symbol()
+					  method_name_without_brackets << read_line.slice( dot_idx + 1, end_idx ).lowercase.as_symbol()
 					  gherkin_class.gherkin_mappings[method_name_without_brackets] << current_gherkin_mapping
 					  current_gherkin_mapping << rope.new()
 				  _endif 

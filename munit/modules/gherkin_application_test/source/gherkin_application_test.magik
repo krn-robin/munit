@@ -6,9 +6,17 @@ _pragma(classify_level=debug, topic={Munit})
 ##
 ## Parent class for Gherkin-driven application tests
 ##
+## Leaf cases must declare their own test_aspects (an empty property_list
+## is enough): application_test defaults to {:never}, and an unrunnable leaf
+## counts as passed without running.
+##
 def_slotted_exemplar( :gherkin_application_test,
         {},
         {:gherkin_test_case, :application_test} )
+$
+
+# test_case and database_test both define run_bare; take application_test's branch.
+gherkin_application_test.method_table.resolve_conflicts( :application_test )
 $
 
 # Below are all conflict resolution methods
