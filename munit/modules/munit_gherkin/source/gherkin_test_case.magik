@@ -165,7 +165,7 @@ _method gherkin_test_case.create_gherkin_tests()
 			_then
 				_self.complete_test_section( test_def )
 				_leave
-			_elif test_line ~= ""
+			_elif test_line.trim_spaces() ~= ""
 			_then
 				(test_def, ignore_bad_text?) << _self.process_line( test_line.trim_spaces(), test_def, ignore_bad_text? )
 			_endif
