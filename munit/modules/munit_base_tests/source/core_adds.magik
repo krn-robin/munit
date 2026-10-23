@@ -66,7 +66,7 @@ _proc( name , slots , _optional super_exemplars )
 		_for i , s _over supers.keys_and_elements()
 		_loop
 			_if _not inherit_from_local_ex? _andif
-			    s.sys!perform( :sys!slot_number|()| , int!slot_name ) _isnt _unset
+			    s.define_method_target.method_at( int!slot_name ) _isnt _unset
 			_then
 				inherit_from_local_ex? << _true 
 			_endif
@@ -87,28 +87,8 @@ _proc( name , slots , _optional super_exemplars )
 		ex.define_slot_externally_writable( sv[1] , :public )
 	_endloop
 
-	 ex.perform( int!slot_name + :|<<| , find_parent_method() )
+	 ex.perform( int!slot_name + :|<<| , _unset )
 	
 	>> ex
-_endproc
-$
-
-_pragma(classify_level=debug,topic={code})
-_global _constant find_parent_method <<
-_proc()
-	q << atomic_queue.new( 1 )
-	
-	_local result
-	_proc( q , t )
-		_import result
-		_protect
-			result << t.vm_stack.chain.chain.chain.method_hint
-		_protection
-			q.put( 1 )
-		_endprotect
-	_endproc.fork_at( _thisthread.vm_priority-1 , q , _thisthread ).resume()
-	q.get()
-
-	>> result 
 _endproc
 $

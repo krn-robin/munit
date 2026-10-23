@@ -1,0 +1,31 @@
+#% text_encoding = iso8859_1
+_package sw
+
+_pragma(classify_level=debug,topic=MUnit)
+##  A test case testing the inheritance of the int!owner slot by def_local_exemplar.
+def_slotted_exemplar(:core_adds_test,
+{},
+{:test_case})
+$
+
+_pragma(classify_level=debug,topic=MUnit)
+def_slotted_exemplar(:core_adds_owned_super,
+{
+	{ :int!owner , _unset }
+})
+$
+
+_pragma(classify_level=debug,topic=MUnit)
+core_adds_owned_super.define_slot_externally_writable( :int!owner , :public )
+$
+
+_pragma(classify_level=debug,topic=MUnit)
+_method core_adds_test.test_def_local_exemplar_inherits_int_owner()
+
+	_local child
+	child << def_local_exemplar( :core_adds_child , {} , {core_adds_owned_super} )
+
+	_self.assert( child.define_method_target.method_at( :int!owner ) _isnt _unset , :is , _true , "child inherits int!owner" )
+	_self.assert( child.define_method_target.local_method?( :int!owner ) , :is , _false , "child owns no second int!owner" )
+_endmethod
+$

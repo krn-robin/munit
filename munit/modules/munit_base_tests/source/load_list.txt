@@ -1,3 +1,4 @@
 core_adds
+core_adds_test
 framework/
 extensions/
